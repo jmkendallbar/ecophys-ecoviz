@@ -1,62 +1,58 @@
 
-# ecoviztemplate
+# EcoViz Ecophysiology Seal Sleep Classifier
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-This is the use case template for the EcoViz+AI workshop.
 
-## How to use the template
-
-This should be done once by the project lead. After the project lead creates their copy of the repository on GitHub, everyone else in the group will create their own fork.
-
-### Clone locally
-
-To use this template, clone this repo and rename it.
-
-From the directory where you keep git repositories (e.g., ~/Documents/GitHub/), run this command.
-
-`git clone https://github.com/FlukeAndFeather/ecoviztemplate.git [your repo name]` 
-
-Make sure to replace `[your repo name]` with the repo name you've chosen for your use case. Otherwise it'll be called "ecoviztemplate".
-
-### Push to GitHub
-
-Create a remote repository on GitHub with the same name.
-
-Then, back at the command line, change the remote-url to match your new repository (replacing the username and repo name).
-
-`git remote set-url origin https://github.com/[your username]/[your repo name].git`
-
-Then push your local to the remote.
-
-`git push -u origin main`
-
-## What's in the template
-
-The template is organized to accomplish the three goals of a research compendium.
-
-1. Folders and files organized according to conventions
-2. Modular organization of data, methods, and outputs
-3. Record of the computational environment
-
-This template supports analyses in Python, R, or a combination of the two.
 
 ### Folder structure
 
 ```
+├── DESCRIPTION
+├── README.md
 ├── data
+│   ├── README.md
+│   ├── test12_Wednesday_05_ALL_PROCESSED.edf
+│   ├── test12_Wednesday_05_DAY1_PROCESSED.edf
+│   └── test12_Wednesday_06_Hypnogram_JKB_1Hz.csv
 ├── figs
+│   ├── README.md
+│   ├── light-sleep-spectral-power.png
+│   ├── rem.png
+│   ├── slow-wave-1.png
+│   ├── slow-wave-2-spectral-power.png
+│   └── slow-wave-2.png
 ├── notebooks
+│   ├── 00_initial_feature_extraction.ipynb
+│   ├── 01_initial_models.ipynb
+│   ├── 01a_YASA_feature_extraction.ipynb
+│   ├── 02_advanced_feature_generation_and_models.ipynb
+│   ├── 03_recursive_feature_elimination.ipynb
+│   └── README.md
 ├── output
+│   └── README.md
 ├── paper
+│   └── README.md
 ├── pipeline
-└── src
-|   ├── Python
-|   └── R
+│   ├── 00_download_data.R
+│   ├── 00_download_data.py
+│   ├── _run_pipeline.R
+│   └── _run_pipeline.py
+├── requirements.txt
+├── src
+│   ├── Python
+│   │   ├── README.md
+│   │   ├── feature_extraction.py
+│   │   └── feature_generation.py
+│   └── R
+│       └── README.md
 └── traintest
     ├── test
+    │   └── README.md
     └── train
+        ├── README.md
+        └── Wednesday_features_v2_with_labels.csv
 ```
 
 * `data/` - raw data only
@@ -81,42 +77,32 @@ These are conventional files used for recording package dependencies.
 
 `requirements.txt` is a file used to record Python package dependencies. Users can install dependencies by running `pip install -r requirements.txt` at the command line.
 
-### Pipeline components
-
-```
-├── data
-├── figs
-├── output
-├── pipeline
-│   ├── 00_download_data.R
-│   ├── 00_download_data.py
-│   ├── _run_pipeline.R
-│   └── _run_pipeline.py
-└── src
-|   ├── Python
-|   └── R
-└── traintest
-    ├── test
-    └── train
-```
-
-The pipeline folder structure supports modular organization of your code. This modular organization makes it easier to:
-
-* Distribute development among collaborators
-* Document pipeline functionality
-* Reuse or replace components over time
+### Pipeline steps
 
 Here's how the pipeline flows.
 
-1. `pipeline > _run_pipeline.R` or `pipeline > _run_pipeline.py` is a single script that runs the full pipeline.
-2. `_run_pipeline.*` calls pipeline scripts in order e.g., `00_download_data.R`, `01_preprocess_data.R`, `02_fit_model.R`, ..., `10_render_notebooks.R`.
-3. Pipeline scripts use functions, classes, and constant defined by the modules in `src/Python/` or scripts in `src/R/`.
-4. Pipeline scripts generate processed data in `output/` and static visualizations in `figs/`.
-5. Train/test splits for AI models use the identifiers in `traintest/train/` and `traintest/test/`.
+#### 00_initial_feature_extraction.ipynb
+Initial notebook used for feature extraction, not the prettiest of notebooks, but walks through heart rate extraction from ECG using peak detection. Also goes through each of the features and plots their distributions to get a first-pass glimpse at the feature space.
 
-`00_download_data.R` and `00_download_data.py` are provided as examples. Replace them and add additional pipeline scripts as appropriate.
+#### 01_initial_features_and_models.ipynb
+Uses the features created in *00_initial_feature_extraction* to create a few rudimentary scikit-learn machine learning models, including a Support Vector Machine Classifier (SVC), K Nearest Neighbors Classifier (KNN), and Random Forest Classifier (RFC). Also performs grid searching on each of these estimators to find ideal or close-to-ideal parameterizations of these models.
 
-The last pipeline script should render all literate programming documents (see next section).
+#### 01a_YASA_feature_extraction.ipynb
+Has a simple demonstration of applying the YASA sleep staging algorithm built for humans onto one seal. While the performance is not the best, many of the features implemented by YASA were used for this project, and in some cases their code was used as well (but adjusted for seals). Note that YASA requires a LOT of memory and the kernel often crashes for me if I have other notebooks running or too many Google Chrome tabs open.
+
+#### 02_advanced_feature_generation_and_models.ipynb
+Uses the (semi) finalized feature extraction code in ***feature_extraction.py*** and ***feature_generation.py*** to generate all the available features for sleep detection created so far. Also creates a RFC using the grid-searched parameters from ***01_initial_features_and_models***, and plots the predictions against the true labels and features for a few naps
+
+#### 03_recursive_feature_elimination.ipynb
+Performs recursive feature elimination using the model from ***02_advanced_feature_generation_and_models.ipynb*** to explore which features are the most informative for seal sleep prediction.
+
+### Feature extraction usage
+
+To run the full feature extraction start to finish, run from the terminal: `python feature_generation.py <Input_EDF_Filepath> <Output_CSV_Filepath> [Config_Filepath]`. The Config_Filepath should be a path to a json file that has key value pairs like the ones in the DEFAULT_CONFIG variable at the top of the feature_generation.py script. These parameters can be used to adjust window size, step size, and other parameters used by some of the feature functions (although some of the parameters have not been tested thoroughly so adjust them at your own risk). Any config keys not defined by the config file will use the default values defined at the top of feature_generation.py
+
+### Model usage
+
+Something here about the models we tried and what went well
 
 ### Use case interpretation
 
