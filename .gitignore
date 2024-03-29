@@ -1,4 +1,7 @@
 .Rproj.user
+__pycache__
+*features*.csv
+.ipynb_checkpoints
 .Rhistory
 .RData
 .Ruserdata
