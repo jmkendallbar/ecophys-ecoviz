@@ -107,6 +107,9 @@ def get_features_yasa(a, start_index, end_index, freq_broad=(0.4, 30), freq=500,
 
     # Convert to dataframe
     feat = pd.DataFrame(feat)
+    for col in feat.columns:
+        if col != 'yasa_time':
+            feat[col] = pd.to_numeric(feat[col])
     return feat
 
 
