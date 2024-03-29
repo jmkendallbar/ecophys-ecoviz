@@ -9,50 +9,51 @@
 ### Folder structure
 
 ```
+├── 00_Data_Exploration.ipynb
 ├── DESCRIPTION
 ├── README.md
 ├── data
-│   ├── README.md
-│   ├── test12_Wednesday_05_ALL_PROCESSED.edf
-│   ├── test12_Wednesday_05_DAY1_PROCESSED.edf
-│   └── test12_Wednesday_06_Hypnogram_JKB_1Hz.csv
+│   └── README.md
 ├── figs
-│   ├── README.md
-│   ├── light-sleep-spectral-power.png
-│   ├── rem.png
-│   ├── slow-wave-1.png
-│   ├── slow-wave-2-spectral-power.png
-│   └── slow-wave-2.png
+│   ├── README.md
+│   ├── light-sleep-spectral-power.png
+│   ├── rem.png
+│   ├── slow-wave-1.png
+│   ├── slow-wave-2-spectral-power.png
+│   └── slow-wave-2.png
 ├── notebooks
-│   ├── 00_initial_feature_extraction.ipynb
-│   ├── 01_initial_models.ipynb
-│   ├── 01a_YASA_feature_extraction.ipynb
-│   ├── 02_advanced_feature_generation_and_models.ipynb
-│   ├── 03_recursive_feature_elimination.ipynb
-│   └── README.md
+│   ├── 00_initial_feature_extraction.ipynb
+│   ├── 01_initial_models.ipynb
+│   ├── 01a_YASA_feature_extraction.ipynb
+│   ├── 02_advanced_feature_generation_and_models.ipynb
+│   ├── 03_recursive_feature_elimination.ipynb
+│   ├── 04_lgbm_feature_viz.ipynb
+│   ├── Basic GBTM Example.ipynb
+│   ├── Boosted Decision Tree Experiments.ipynb
+│   └── README.md
 ├── output
-│   └── README.md
+│   └── README.md
 ├── paper
-│   └── README.md
+│   └── README.md
 ├── pipeline
-│   ├── 00_download_data.R
-│   ├── 00_download_data.py
-│   ├── _run_pipeline.R
-│   └── _run_pipeline.py
+│   ├── 00_download_data.R
+│   ├── 00_download_data.py
+│   ├── _run_pipeline.R
+│   └── _run_pipeline.py
 ├── requirements.txt
 ├── src
-│   ├── Python
-│   │   ├── README.md
-│   │   ├── feature_extraction.py
-│   │   └── feature_generation.py
-│   └── R
-│       └── README.md
+│   ├── Python
+│   │   ├── README.md
+│   │   ├── feature_extraction.py
+│   │   └── feature_generation.py
+│   └── R
+│       └── README.md
 └── traintest
     ├── test
-    │   └── README.md
+    │   └── README.md
     └── train
         ├── README.md
-        └── Wednesday_features_v2_with_labels.csv
+        └── welch_feature_importance.csv
 ```
 
 * `data/` - raw data only
@@ -95,6 +96,9 @@ Uses the (semi) finalized feature extraction code in ***feature_extraction.py***
 
 #### 03_recursive_feature_elimination.ipynb
 Performs recursive feature elimination using the model from ***02_advanced_feature_generation_and_models.ipynb*** to explore which features are the most informative for seal sleep prediction.
+
+#### 04_lgbm_feature_viz.ipynb
+Separating EEG bandpower features into smaller bands (from delta to 0-0.5 Hz, 0.5-1Hz, 1-2Hz, etc.) to  Using gradient boosted decision tree lightGBM. Output is a CSV with `WELCH` `_` Resolution (length in seconds of window) `_` Name of feature (if two numbers, range of frequencies; if a name, type of feature).
 
 ### Feature extraction usage
 
