@@ -11,3 +11,5 @@ pyedflib
 sleepecg
 wfdb
 pytz
+leidenalg
+igraph
