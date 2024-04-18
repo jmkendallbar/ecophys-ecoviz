@@ -1,4 +1,4 @@
-import feature_extraction as seal_fe # Seal feature extraction
+import src.features.feature_generation_utils as seal_fe # Seal feature extraction
 import datetime
 import json
 import mne
