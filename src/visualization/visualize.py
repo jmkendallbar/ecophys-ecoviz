@@ -11,10 +11,12 @@ LABEL_COLORS = {
     "Drowsiness": "#BBA9CF",
     "Quiet Waking": "#225ea8",
     "Active Waking": "#0c2c84",
-    "Unscorable": "#D7D7D7"
+    "Unscorable": "#D7D7D7",
+    "SWS": "#41b6c4",
+    "REM": "#FCBE46"
 }
 
-def plot_feature_density(df, feat_col, labels_col, filter_val=0.01):
+def plot_feature_density(df, feat_col, labels_col, title=None, filter_val=0.01):
     """
     plots the density of a feature, colored by the label
     df: DataFrame with data
@@ -28,3 +30,6 @@ def plot_feature_density(df, feat_col, labels_col, filter_val=0.01):
         (df[feat_col] < df[feat_col].quantile(1 - filter_val))
     ]
     ax = sns.kdeplot(df, x=feat_col, hue=labels_col, palette=LABEL_COLORS)
+    if title is not None:
+        ax.set_title(title)
+    return ax

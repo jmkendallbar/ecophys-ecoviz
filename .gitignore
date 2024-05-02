@@ -8,8 +8,6 @@ __pycache__
 .DS_Store
 !data/README.md
 data/interim/*
-data/processed/v1_features/*
-data/processed/v2_features/*
-data/processed/v3_features/*
+data/processed/*
 data/raw/01_edf_data/*
 data/raw/02_hypnogram_data/*
