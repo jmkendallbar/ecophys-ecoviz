@@ -4,7 +4,10 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
-
+This research compendium applies a `lightgbm` gradient boosted decision tree model to score sleep stages in a non-model system, the northern elephant seal (*Mirounga angustirostris*). We apply a three step process to build and refine our model:
+- **Step 1:** First, we train and test a model based on features assumed to be important based on previous studies and manual data review
+- **Step 2:** Next, we try a naive approach where we calculate features based on a range of settings including epochs from Xs to Xs and FFT window sizes from Xs to Xs. We plot the resulting feature importances and the accuracy of models with different feature settings. We use these to inform features for step 3.
+- **Step 3:** Based on the results from Step 2, we calculate the accuracy for detecting each sleep stage given every combination of feature settings. For example, if a model to detect the sleep stage `Active Waking` (alone) was most accurate with epochs and Welch window sizes of 64s and 16s for EEG and 256s and 64s for Heart Rate, we would use those settings 
 
 ### Folder structure
 
