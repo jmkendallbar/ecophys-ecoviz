@@ -143,7 +143,7 @@ def generate_features(path_to_edf, output_csv_path=None, custom_config=None):
     yasa_features_eeg = seal_fe.generate_features_sequential(eeg_raw, recording_start_datetime, data_type='EEG', sfreq=500, window_length_sec=3600, buffer_length_sec=300,
                                                              epoch_size_sec=config['YASA EEG Epoch Window Size'],
                                                              welch_window_sec=config['YASA EEG Welch Window Size'],
-                                                             step_size=config['YASA EEG Step Size'], config={})
+                                                             step_size=config['YASA EEG Step Size'])
     del(eeg_raw)
     print('done', end='\n\n' + '-'*50 + '\n')
 
@@ -178,15 +178,77 @@ def generate_features(path_to_edf, output_csv_path=None, custom_config=None):
     else:
         return(features_df, yasa_features_eeg, yasa_features_heartrate)
 
-    # if len(yasa_features_ecg) == len(features_df):
-    #     features_df = pd.concat([features_df, yasa_features_ecg], axis=1)
-    # else:
-    #     return((features_df, yasa_features_eeg, yasa_features_ecg))
     print('NA Values:\n', features_df.isna().sum())
     # Write to CSV
     if output_csv_path is not None:
         print(f'Writing to output file: {output_csv_path}')
         features_df.to_csv(output_csv_path)
+    return features_df
+
+def generate_features_separated(path_to_raw_folder, seal_name, output_csv_path=None, custom_config=None):
+    """
+    Helper function to generate features for if the input edf file is split into multiple days. First concatenates them and saves the edf, then generates features
+    """
+    def concatenate_raws(folder, seal_name):
+        """
+        Function to concatenate raw edf objects into one file
+        """
+        folder_files = os.listdir(folder)
+        seal_files = sorted([file for file in folder_files if seal_name in file and 'DAY' in file])
+        
+        # Define the PST timezone
+        pst_timezone = pytz.timezone('America/Los_Angeles')
+        
+        # Define array to hold raw objects and array to hold start datetimes
+        raws = []
+        start_datetimes = []
+        for seal_file in seal_files:
+            print(seal_file)
+            raw = mne.io.read_raw_edf(f'{folder}/{seal_file}',
+                                    include=['ECG_Raw_Ch1', 'REEG2_Pruned_Ch7', 'GyrZ', 'MagZ', 'Depth'],
+                                    preload=True, verbose=False)
+            fs = raw.info['sfreq']
+            duration = len(raw) / fs
+            
+            # Extract the measurement date (start time) from raw.info
+            start_time = raw.info['meas_date']
+
+            # Convert to datetime object in PST
+            if isinstance(start_time, datetime.datetime):
+                # If it's already a datetime object, just replace the timezone
+                recording_start_datetime = start_time.replace(tzinfo=None).astimezone(pst_timezone)
+            elif isinstance(start_time, (int, float)):
+                # Convert timestamp to datetime in PST
+                recording_start_datetime = pst_timezone.localize(datetime.datetime.fromtimestamp(start_time))
+            print('Start:', recording_start_datetime)
+            print('End:', recording_start_datetime + datetime.timedelta(seconds=duration))
+            start_datetimes.append(recording_start_datetime)
+            raws.append(raw)
+            print()
+            
+        # sort raw objects by their start datetime
+        raws = [raw for _, raw in sorted(zip(start_datetimes, raws))]
+
+        return mne.concatenate_raws(raws)
+    print('Concatenating', seal_name)
+    path_to_edf_folder = path_to_raw_folder + '/01_edf_data'
+    seal_raw = concatenate_raws(path_to_edf_folder, seal_name)
+    mne.export.export_raw(f'{path_to_edf_folder}/{seal_name}_05_ALL_PROCESSED.edf', seal_raw, fmt='edf',
+                        overwrite=True)
+    del(seal_raw)
+    print('Calculating features for', seal_name)
+    features_df = generate_features(
+        f'{path_to_edf_folder}/{seal_name}_ALL_PROCESSED.edf',
+        output_csv_path=output_csv_path,
+        custom_config=custom_config
+    )
+    path_to_hypnogram_folder = path_to_raw_folder + '/02_hypnogram_data'
+    labels = pd.read_csv(f'{path_to_hypnogram_folder}/{seal_name}_06_Hypnogram_JKB_1Hz.csv')
+    labels['R.Time'] = pd.to_datetime(labels['R.Time']).dt.tz_localize('America/Los_Angeles')
+    labels = labels.set_index('R.Time', drop=True)[['Simple.Sleep.Code']]
+    features_df = features_df.merge(labels, how='outer', left_index=True, right_index=True)
+    features_df.to_csv(f'/data/process/features/{seal_name}_07_features_with_labels.csv')
+    features_df.name = f'{seal_name}_features'
     return features_df
 
 # ---------------------------------------------------------------------------------------------------------------------------------------
@@ -197,7 +259,7 @@ if __name__ == '__main__':
 
     """
     WED_INPUT_FILE = 'data/raw/01_edf_data/test12_Wednesday_05_ALL_PROCESSED.edf'
-    WED_OUTPUT_FILE = 'data/processed/Wednesday_features_with_labels_v3.csv'
+    WED_OUTPUT_FILE = 'data/processed/features/test12_Wednesday_07_features_with_labels.csv'
     WED_LABELS_FILE = 'data/raw/02_hypnogram_data/test12_Wednesday_06_Hypnogram_JKB_1Hz.csv'
     parser = ArgumentParser()
     parser.add_argument("-i", "--input", dest="input", type=str, help="input .edf filepath",

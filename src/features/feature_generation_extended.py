@@ -15,6 +15,13 @@ import feature_generation_utils as seal_fe # seal feature extraction
 
 # generate EEG features
 def generate_eeg_extended_features(eeg_data, recording_start_datetime, sfreq, output_dir, file_name, epoch_sizes, welch_sizes):
+    # Generate more fine-grain spectral ranges for bandpower
+    bands = [
+        (0, 0.5, "BP_0_0.5"),
+        (0.5, 1, "BP_0.5_1")
+    ] + [
+        (i, i+1, f"BP_{i}_{i+1}") for i in range(1, 31)
+    ]
     ref_time = time.time()
     eeg_output_dir = output_dir + '/EEG'
     os.makedirs(eeg_output_dir, exist_ok=True)
@@ -25,16 +32,22 @@ def generate_eeg_extended_features(eeg_data, recording_start_datetime, sfreq, ou
     print('Expecting to take ~', num_iterations * 3, ' minutes', sep='')
     for epoch_size in epoch_sizes:
         for welch_size in welch_sizes:
+            if welch_size > epoch_size:
+                print(f'Welch Size of {welch_size} greater than Epoch size of {epoch_size}, skipping...', sep='')
+                print()
+                continue
             ref_time = time.time()
             step_size = epoch_size // 8 if epoch_size >= 8 else 1
             eeg_features = seal_fe.generate_features_sequential(eeg_data, recording_start_datetime, data_type='EEG', sfreq=sfreq, window_length_sec=3600, buffer_length_sec=300,
-                                                                epoch_size_sec=epoch_size, welch_window_sec=welch_size, step_size=step_size, config={})
+                                                                epoch_size_sec=epoch_size, welch_window_sec=welch_size, step_size=step_size, bands=bands)
             eeg_features = eeg_features.rename(lambda x: f'EPOCH_{epoch_size}_WELCH_{welch_size}_EEG_{x}', axis=1)
             eeg_features_all.append(eeg_features)
             counter += 1
+            print(f'Finished Welch size of {welch_size} and Epoch size of {epoch_size}')
             print('Time Taken:', time.time() - ref_time)
             ref_time = time.time()
-            print('EEG Progress: ', round(((counter / num_iterations) * 100), 2), '%\n', sep='')
+            print('EEG Progress: ', round(((counter / num_iterations) * 100), 2), '%', sep='')
+            print()
     eeg_features_df = pd.concat(eeg_features_all, axis=1)
     print('Writing EEG features to file...')
     eeg_features_df.to_csv(f'{eeg_output_dir}/{file_name}_EEG.csv')
@@ -53,13 +66,18 @@ def generate_ecg_extended_features(ecg_data, recording_start_datetime, sfreq, ou
     print('Expecting to take ~', num_iterations * 1.5, ' minutes', sep='')
     for epoch_size in epoch_sizes:
         for welch_size in welch_sizes:
+            if welch_size > epoch_size:
+                print(f'Welch Size of {welch_size} greater than Epoch size of {epoch_size}, skipping...', sep='')
+                print()
+                continue
             ref_time = time.time()
             step_size = epoch_size // 8 if epoch_size >= 8 else 1
             hr_features = seal_fe.generate_features_sequential(heart_rate.values, recording_start_datetime, data_type='HR', sfreq=sfreq, window_length_sec=3600, buffer_length_sec=300,
-                                                               epoch_size_sec=epoch_size, welch_window_sec=welch_size, step_size=step_size, config={})
+                                                               epoch_size_sec=epoch_size, welch_window_sec=welch_size, step_size=step_size)
             hr_features = hr_features.rename(lambda x: f'EPOCH_{epoch_size}_WELCH_{welch_size}_HR_{x}', axis=1)
             hr_features_all.append(hr_features)
             counter += 1
+            print(f'Finished Welch size of {welch_size} and Epoch size of {epoch_size}')
             print('Time Taken:', time.time() - ref_time)
             ref_time = time.time()
             print('Heart Rate Progress: ', round(((counter / num_iterations) * 100), 2), '%\n', sep='')

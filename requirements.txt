@@ -1,5 +1,6 @@
 yasa
 mne
+EDFlib-Python
 scipy
 six
 scikit-learn

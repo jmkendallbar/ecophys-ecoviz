@@ -30,7 +30,7 @@ from scipy.signal import hann, welch
 # COMMON FUNCTIONS |
 # -----------------|
 def generate_features_sequential(data, recording_start_datetime, data_type='EEG', sfreq=500, window_length_sec=3600, buffer_length_sec=300, epoch_size_sec=32,
-                                 welch_window_sec=4, step_size=4, config={}):
+                                 welch_window_sec=4, step_size=4, bands=None):
     """
     Generates features 1 hour at a time to preserve memory
     data: either eeg or heart rate data to generate features for
@@ -58,9 +58,9 @@ def generate_features_sequential(data, recording_start_datetime, data_type='EEG'
             indices[1] = len(data)
         data_subset = data[indices_extra_window[0]:indices_extra_window[1]]
         if data_type == 'EEG':
-            features_subset = get_features_yasa_eeg(data_subset, sfreq=sfreq, epoch_window_sec=epoch_size_sec, welch_window_sec=welch_window_sec, step_size=step_size, **config)
+            features_subset = get_features_yasa_eeg(data_subset, sfreq=sfreq, epoch_window_sec=epoch_size_sec, welch_window_sec=welch_window_sec, step_size=step_size, bands=bands)
         elif data_type == 'HR':
-            features_subset = get_features_yasa_heartrate(data_subset, sfreq=sfreq, epoch_window_sec=epoch_size_sec, welch_window_sec=welch_window_sec, step_size=step_size, **config)
+            features_subset = get_features_yasa_heartrate(data_subset, sfreq=sfreq, epoch_window_sec=epoch_size_sec, welch_window_sec=welch_window_sec, step_size=step_size)
         
         # Add the starting index in seconds to the epoch index, then subset the returned features to only the current window (get rid of the buffer on each side)
         features_subset['epoch_index'] = features_subset['epoch_index'] + indices_extra_window[0] // 500
@@ -140,9 +140,11 @@ def get_heart_rate(ecg_data, fs=500, search_radius=200, filter_threshold=200):
                       and impute it from its neighbors)
     """
     rpeaks = detect_heartbeats(ecg_data, fs) # using sleepecg
+    print('here 1')
     rpeaks_corrected = wfdb.processing.correct_peaks(
         ecg_data, rpeaks, search_radius=search_radius, smooth_window_size=50, peak_dir="up"
     )
+    print('here 2')
     # MIGHT HAVE TO UPDATE search_radius
     heart_rates = [60 / ((rpeaks_corrected[i+1] - rpeaks_corrected[i]) / fs) for i in range(len(rpeaks_corrected) - 1)]
     # Create a heart rate array matching the frequency of the ECG trace
@@ -152,10 +154,12 @@ def get_heart_rate(ecg_data, fs=500, search_radius=200, filter_threshold=200):
         start_idx = rpeaks_corrected[i]
         end_idx = rpeaks_corrected[i+1]
         hr_data[start_idx:end_idx] = heart_rates[i]
+    print('here 3')
     hr_data = pd.Series(hr_data)
     filled = hr_data.isna().sum()
     hr_data[hr_data > filter_threshold] = np.nan
     hr_data = hr_data.interpolate(method='quadratic', order=5).fillna('ffill').fillna('bfill')
+    print('here 4')
     # there is probably a function out here that does this but just imputing with closest non-na direct left and direct right neighbor
     # i = 0
     # start_fill = -1
@@ -264,7 +268,7 @@ def get_features_yasa_heartrate(heart_rate_data, sfreq=500, epoch_window_sec=512
 # -------------|
 # EEG FEATURES |
 # -------------|
-def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4, epoch_window_sec=32, step_size=4):
+def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4, epoch_window_sec=32, step_size=4, bands=None):
     import os
     import mne
     import glob
@@ -284,14 +288,16 @@ def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4
     # Welch keyword arguments
 
     kwargs_welch = dict(window="hamming", nperseg=welch_window_sec*sfreq, average="median")
-    bands = [
-        (0.4, 1, "sdelta"),
-        (1, 4, "fdelta"),
-        (4, 8, "theta"),
-        (8, 12, "alpha"),
-        (12, 16, "sigma"),
-        (16, 30, "beta"),
-    ]
+    if bands is None:
+        bands = [
+            (0.4, 1, "sdelta"),
+            (1, 4, "fdelta"),
+            (4, 8, "theta"),
+            (8, 12, "alpha"),
+            (12, 16, "sigma"),
+            (16, 30, "beta"),
+        ]
+    
     #  Preprocessing
     # - Filter the data
     dt_filt = filter_data(
@@ -301,6 +307,15 @@ def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4
     times, epochs = sliding_window(dt_filt, sf=sfreq, window=epoch_window_sec, step=step_size)
     times = times + epoch_window_sec // 2 # add window/2 to the times to make the epochs "centered" around the times
 
+    window_length = sfreq*welch_window_sec
+    kwargs_welch = dict(
+        window='hann',
+        nperseg=window_length, # a little more than  4 minutes
+        noverlap=window_length//2,
+        scaling='density',
+        average='median'
+    )
+    
     # Calculate standard descriptive statistics
     hmob, hcomp = ant.hjorth_params(epochs, axis=1)
 
@@ -322,16 +337,21 @@ def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4
         feat[b] = bp[j]
 
     # Add power ratios for EEG
-    delta = feat["sdelta"] + feat["fdelta"]
-    feat["dt"] = delta / feat["theta"]
-    feat["ds"] = delta / feat["sigma"]
-    feat["db"] = delta / feat["beta"]
-    feat["at"] = feat["alpha"] / feat["theta"]
-
+    if 'sdelta' in feat:
+        delta = feat["sdelta"] + feat["fdelta"]
+        feat["dt"] = delta / feat["theta"]
+        feat["ds"] = delta / feat["sigma"]
+        feat["db"] = delta / feat["beta"]
+        feat["at"] = feat["alpha"] / feat["theta"]
+    
     # Add total power
     idx_broad = np.logical_and(freqs >= freq_broad[0], freqs <= freq_broad[1])
     dx = freqs[1] - freqs[0]
     feat["abspow"] = np.trapz(psd[:, idx_broad], dx=dx)
+
+    # Add relative power standard deviation
+    for j, (_, _, b) in enumerate(bands):
+        feat[b + '_std'] = [np.std(bp[j])] * len(bp[j])
 
     # Add relative power bands
     for j, (_, _, b) in enumerate(bands):
