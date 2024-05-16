@@ -36,7 +36,7 @@ $(FEATURES_DIR)/test12_Wednesday_07_features_with_labels.csv: download
 
 features: $(FEATURES_DIR)/test12_Wednesday_07_features_with_labels.csv
 
-models/lightgbm_model_basic.pkl: data/processed/features/test12_Wednesday_07_features_with_labels.csv
+models/lightgbm_model_basic.pkl: $(FEATURES_DIR)/test12_Wednesday_07_features_with_labels.csv
 	python src/models/build_model_LGBM.py
 
 model: models/lightgbm_model_basic.pkl
@@ -45,7 +45,7 @@ model: models/lightgbm_model_basic.pkl
 $(FEAT_DISC_DIR)/EEG/Wednesday_feature_discovery_EEG.csv:
 	python src/features/feature_generation_extended.py
 
-features_extended: $(FEAT_DISC_DIR)/EEG/Wednesday_feature_discovery_EEG.csv $(FEAT_DISC_DIR)/ECG/Wednesday_feature_discovery_ECG.csv features download
+features_extended: $(FEAT_DISC_DIR)/EEG/Wednesday_feature_discovery_EEG.csv $(FEAT_DISC_DIR)/ECG/Wednesday_feature_discovery_ECG.csv download features
 
 models/lightgbm_model_extended.pkl:
 	python src/models/build_extended_model_LGBM.py
@@ -59,13 +59,12 @@ models/lgbm_model_refined.pkl:
 refined_model: models/lgbm_model_refined.pkl 
 
 # Visualization targets
-visualize_features: $(FEATURES_DIR)/ $(HYPNOGRAM_FILE)
+visualize_basic: $(FEATURES_DIR)/ $(HYPNOGRAM_FILE)
 
-visualize_predictions: $(FEATURES_FILE) $(HYPNOGRAM_FILE) $(MODEL_FILE)
+visualize_extended: $(FEATURES_FILE) $(HYPNOGRAM_FILE) $(MODEL_FILE)
 
-visualize_feature_importance: $(FEATURE_IMPORTANCE_FILE)
+visualize_refined: $(FEATURE_IMPORTANCE_FILE)
 
-evaluation: $(FEATURES_FILE) $(HYPNOGRAM_FILE) $(MODEL_FILE)
 
 notebook:
 	jupyter notebook --notebook-dir=$(pwd)

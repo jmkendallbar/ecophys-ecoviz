@@ -1,19 +1,19 @@
-if __name__ == '__main__':
-    import feature_generation_utils as seal_fe # Seal feature extraction
-else:
-    import src.features.feature_generation_utils as seal_fe # Seal feature extraction
+from argparse import ArgumentParser
 import datetime
 import json
 import mne
+import numpy as np
 import os
 import pandas as pd
-import numpy as np
 import pytz
 import warnings
-
 warnings.simplefilter('ignore')
 
-from argparse import ArgumentParser
+# custom functions
+if __name__ != '__main__' and 'src' in __name__: # when being imported from the context of the src package
+    import src.features.feature_generation_utils as seal_fe # Seal feature extraction
+else:
+    import feature_generation_utils as seal_fe # Seal feature extraction
 
 # ------------------|
 # Feature Generator |
@@ -33,14 +33,21 @@ DEFAULT_CONFIG = {
     'ODBA Calculation Window': 30, # Window size in seconds to use for ODBA mean and standard deviation
     'GyrZ Freq': 25, # Frequency of GyrZ data
     'GyrZ Calculation Window': 30, # Window size in seconds to use for GyrZ mean and standard deviation
-    'YASA EEG Epoch Window Size': 128, # Window size in seconds to use for YASA feature epochs
+    'YASA EEG Epoch Window Size': 30, # Window size in seconds to use for YASA feature epochs
     'YASA EEG Welch Window Size': 4, # Window size in seconds to use for YASA welch power spectral density calculation
-    'YASA EEG Step Size': 16, # Step size in seconds of windows for YASA epochs
-    'YASA Heart Rate Epoch Window Size': 512, # Window size in seconds to use for YASA heart rate feature epochs
-    'YASA Heart Rate Welch Window Size': 512, # Window size in seconds to use for YASA heart rate welch power spectral density calculation
-    'YASA Heart Rate Step Size': 32, # Step size in seconds of windows for YASA heart rate epochs
+    'YASA EEG Step Size': 1, # Step size in seconds of windows for YASA epochs
+    'YASA Heart Rate Epoch Window Size': 60, # Window size in seconds to use for YASA heart rate feature epochs
+    'YASA Heart Rate Welch Window Size': 4, # Window size in seconds to use for YASA heart rate welch power spectral density calculation
+    'YASA Heart Rate Step Size': 1, # Step size in seconds of windows for YASA heart rate epochs
 }
 def generate_features(path_to_edf, output_csv_path=None, custom_config=None):
+    """
+    This is the main function for generating features given a path to an EDF file
+    path_to_edf: absolute or relative path to the EDF file
+    output_csv_path: output path to save a .csv file containing the features, if None, only returns the features
+    custom_config: optional variable to provide custom config features. This is expected to either be a python dictionary or a path to a JSON file.
+                   Any config values not specified will use the defaults in the above DEFAULT_CONFIG dictionary
+    """
     # Load Config
     config = DEFAULT_CONFIG
     if custom_config is not None:
@@ -255,8 +262,7 @@ def generate_features_separated(path_to_raw_folder, seal_name, output_csv_path=N
 
 if __name__ == '__main__':
     """
-    parameters:
-
+    For help strings, run python feature_generation.py --help
     """
     WED_INPUT_FILE = 'data/raw/01_edf_data/test12_Wednesday_05_ALL_PROCESSED.edf'
     WED_OUTPUT_FILE = 'data/processed/features/test12_Wednesday_07_features_with_labels.csv'

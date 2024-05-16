@@ -1,20 +1,34 @@
-import os
-import sys
-import pytz
-import numpy as np
-import mne
-import datetime
-import pandas as pd
 from argparse import ArgumentParser
+import datetime
+import mne
+import numpy as np
+import os
+import pandas as pd
+import pytz
+import sys
 import time
 import warnings
 warnings.simplefilter('ignore')
 
 # custom functions
-import feature_generation_utils as seal_fe # seal feature extraction
+if __name__ != '__main__' and 'src' in __name__: # when being imported from the context of the src package
+    import src.features.feature_generation_utils as seal_fe # Seal feature extraction
+else:
+    import feature_generation_utils as seal_fe # Seal feature extraction
+
 
 # generate EEG features
 def generate_eeg_extended_features(eeg_data, recording_start_datetime, sfreq, output_dir, file_name, epoch_sizes, welch_sizes):
+    """
+    Generates EEG features sequentially, by default an hour at a time (includes data before and after to make data at the beginning and end accurate)
+    eeg_data: vector of EEG data
+    recording_start_datetime: datetime object representing the starting point of the EEG data
+    sfreq: sampling frequency of the EEG data 
+    output_dir: directory to save output features
+    file_name: file name to save into the output directory (excludeds the file extension .csv)
+    epoch_sizes: the different settings of epoch sizes to generate features for
+    welch_sizes: the different settings of welch sizes to generate features for
+    """
     # Generate more fine-grain spectral ranges for bandpower
     bands = [
         (0, 0.5, "BP_0_0.5"),
@@ -53,8 +67,21 @@ def generate_eeg_extended_features(eeg_data, recording_start_datetime, sfreq, ou
     eeg_features_df.to_csv(f'{eeg_output_dir}/{file_name}_EEG.csv')
     print()
 
+
 # generate ECG features
 def generate_ecg_extended_features(ecg_data, recording_start_datetime, sfreq, output_dir, file_name, epoch_sizes, welch_sizes, search_radius=200, filter_threshold=200):
+    """
+    Generates ECG heart rate features sequentially, by default an hour at a time (includes data before and after to make data at the beginning and end accurate)
+    ecg_data: vector of ECG data
+    recording_start_datetime: datetime object representing the starting point of the ECG data
+    sfreq: sampling frequency of the ECG data 
+    output_dir: directory to save output features
+    file_name: file name to save into the output directory (excludeds the file extension .csv)
+    epoch_sizes: the different settings of epoch sizes to generate features for
+    welch_sizes: the different settings of welch sizes to generate features for
+    search_radius: optional parameter to pass into wfdb.processing.correct_peaks, how many datapoints around the current to search for another peak and choose only the best
+    filter_threshold: optional parameter to pass into get_heart_rate, filters out and interpolates any bpm value above the filter value
+    """
     hr_output_dir = output_dir + '/ECG'
     os.makedirs(hr_output_dir, exist_ok=True)
     hr_features_all = []
@@ -86,7 +113,11 @@ def generate_ecg_extended_features(ecg_data, recording_start_datetime, sfreq, ou
     hr_features_df.to_csv(f'{hr_output_dir}/{file_name}_ECG.csv')
     print()
 
+
 if __name__ == '__main__':
+    """
+    For help strings, run python feature_generation_extended.py --help
+    """
     start_time = time.time()
     WED_INPUT_FILE = 'data/raw/01_edf_data/test12_Wednesday_05_ALL_PROCESSED.edf'
     WED_OUTPUT_FOLDER = 'data/interim/feature_discovery/'

@@ -1,30 +1,20 @@
-import yasa
-import mne
-#import os
-import scipy
-#import glob
-#import six
-import wfdb
-#import pytz
-#import sklearn
-#import pomegranate
-#import pyedflib
-#import sleepecg
+
+import antropy as ant
 import datetime
-import wfdb.processing
-import plotly.graph_objects as go
+from matplotlib import mlab as mlab
+import matplotlib.pyplot as plt
+import mne
+from mne.filter import filter_data
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-#import entropy as ent
-import random
-import seaborn as sns
-from matplotlib import mlab as mlab
-from sleepecg import detect_heartbeats
 from scipy.integrate import simpson
-from scipy.signal import hann, welch
-
+import scipy.signal as sp_sig
+import scipy.stats as sp_stats
+from sleepecg import detect_heartbeats
+import wfdb
+import wfdb.processing
+from yasa import sliding_window
+from yasa import bandpower_from_psd_ndarray
 
 # -----------------|
 # COMMON FUNCTIONS |
@@ -140,11 +130,9 @@ def get_heart_rate(ecg_data, fs=500, search_radius=200, filter_threshold=200):
                       and impute it from its neighbors)
     """
     rpeaks = detect_heartbeats(ecg_data, fs) # using sleepecg
-    print('here 1')
     rpeaks_corrected = wfdb.processing.correct_peaks(
         ecg_data, rpeaks, search_radius=search_radius, smooth_window_size=50, peak_dir="up"
     )
-    print('here 2')
     # MIGHT HAVE TO UPDATE search_radius
     heart_rates = [60 / ((rpeaks_corrected[i+1] - rpeaks_corrected[i]) / fs) for i in range(len(rpeaks_corrected) - 1)]
     # Create a heart rate array matching the frequency of the ECG trace
@@ -154,55 +142,23 @@ def get_heart_rate(ecg_data, fs=500, search_radius=200, filter_threshold=200):
         start_idx = rpeaks_corrected[i]
         end_idx = rpeaks_corrected[i+1]
         hr_data[start_idx:end_idx] = heart_rates[i]
-    print('here 3')
     hr_data = pd.Series(hr_data)
     filled = hr_data.isna().sum()
     hr_data[hr_data > filter_threshold] = np.nan
     hr_data = hr_data.interpolate(method='quadratic', order=5).fillna('ffill').fillna('bfill')
-    print('here 4')
-    # there is probably a function out here that does this but just imputing with closest non-na direct left and direct right neighbor
-    # i = 0
-    # start_fill = -1
-    # end_fill = -1
-    # count_filled = 0
-    # while i < len(hr_data):
-    #     if hr_data[i] == hr_data[i]:
-    #         if end_fill != -1:
-    #             # calculate window of previous 5 seconds and following 5 seconds, and sample from that
-    #             # do this so that the heart rate standard deviation isn't 0, this makes downstream features np.nan or -np.inf
-    #             offset = int(fs * 5)
-    #             if start_fill >= offset:
-    #                 window_prev = hr_data[start_fill-offset:start_fill]
-    #             else:
-    #                 window_prev = hr_data[0:start_fill]
-    #             if end_fill+1 < len(hr_data) - offset:
-    #                 window_after = hr_data[end_fill+1:end_fill+1+offset]
-    #             else:
-    #                 window_after = hr_data[end_fill+1:len(hr_data)]
-    #             windows_combined = pd.Series(np.concatenate([window_prev, window_after])).dropna()
-    #             hr_data[start_fill:end_fill] = windows_combined.sample(end_fill - start_fill, replace=True).to_list()
-    #             # hr_data[start_fill:end_fill] = np.mean([hr_data[start_fill-1], hr_data[end_fill+1]])
-    #             count_filled += (end_fill - start_fill)
-    #             start_fill = -1
-    #             end_fill = -1
-    #     else:
-    #         if start_fill == -1:
-    #             start_fill = i
-    #         else:
-    #             end_fill = i
-    #     i += 1
-    print('Filled:', filled)
+    print('Filled', filled, 'bad heart rate values')
     return hr_data
 
 # ---------------------------------------------------------------------------------------------------------------------------------------
 def get_features_yasa_heartrate(heart_rate_data, sfreq=500, epoch_window_sec=512, welch_window_sec=512, step_size=32):
-    import antropy as ant
-    import scipy.signal as sp_sig
-    import scipy.stats as sp_stats
-    from yasa import sliding_window
-    from yasa import bandpower_from_psd_ndarray
-    from mne.filter import filter_data
-    
+    """
+    Gets heartrate features using similar code & syntax as YASA's feature generation, calculates deterministic features as well as spectral features
+    heart_rate_data: heart rate vector data (must already be processed from an ECG, this function does NOT take ECG data)
+    sfreq: sampling frequeuency, by default 500 Hz
+    epoch_window_sec: size of the epoch rolling window to use
+    welch_window_sec: size of the welch window for power spectral density calculations (this affects the low frequeuncy power and very low frequency power calculations, etc.)
+    step_size: how big of a step size to use, in seconds
+    """
     dt_filt = filter_data(
         heart_rate_data, sfreq, l_freq=0, h_freq=1, verbose=False
     )
@@ -268,25 +224,18 @@ def get_features_yasa_heartrate(heart_rate_data, sfreq=500, epoch_window_sec=512
 # -------------|
 # EEG FEATURES |
 # -------------|
-def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4, epoch_window_sec=32, step_size=4, bands=None):
-    import os
-    import mne
-    import glob
-    import joblib
-    import logging
-    import numpy as np
-    import pandas as pd
-    import antropy as ant
-    import scipy.signal as sp_sig
-    import scipy.stats as sp_stats
-    import matplotlib.pyplot as plt
-    from mne.filter import filter_data
-    from sklearn.preprocessing import robust_scale
-
-    from yasa import sliding_window
-    from yasa import bandpower_from_psd_ndarray
+def get_features_yasa_eeg(eeg_data, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4, epoch_window_sec=32, step_size=4, bands=None):
+    """
+    Gets ECG features using similar code & syntax as YASA's feature generation, calculates deterministic features as well as spectral features
+    eeg_data: EEG raw vector data
+    freq_broad: broad range frequency of EEG (this is used for "absolute power" calculations, and as a divisor for calculating overall relative power)
+    sfreq: sampling frequeuency, by default 500 Hz
+    epoch_window_sec: size of the epoch rolling window to use
+    welch_window_sec: size of the welch window for power spectral density calculations (this affects the low frequeuncy power and very low frequency power calculations, etc.)
+    step_size: how big of a step size to use, in seconds
+    bands: optional parameter to override the default bands used, for exmaple if you'd like more specific bands than just sdelta, fdelta, theta, alpha, etc
+    """
     # Welch keyword arguments
-
     kwargs_welch = dict(window="hamming", nperseg=welch_window_sec*sfreq, average="median")
     if bands is None:
         bands = [
@@ -301,7 +250,7 @@ def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4
     #  Preprocessing
     # - Filter the data
     dt_filt = filter_data(
-        a, sfreq, l_freq=freq_broad[0], h_freq=freq_broad[1], verbose=False
+        eeg_data, sfreq, l_freq=freq_broad[0], h_freq=freq_broad[1], verbose=False
     )
     # - Extract epochs. Data is now of shape (n_epochs, n_samples).
     times, epochs = sliding_window(dt_filt, sf=sfreq, window=epoch_window_sec, step=step_size)
@@ -315,7 +264,7 @@ def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4
         scaling='density',
         average='median'
     )
-    
+
     # Calculate standard descriptive statistics
     hmob, hcomp = ant.hjorth_params(epochs, axis=1)
 
@@ -347,7 +296,7 @@ def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4
     # Add total power
     idx_broad = np.logical_and(freqs >= freq_broad[0], freqs <= freq_broad[1])
     dx = freqs[1] - freqs[0]
-    feat["abspow"] = np.trapz(psd[:, idx_broad], dx=dx)
+    feat["abspow"] = simpson(psd[:, idx_broad], dx=dx)
 
     # Add relative power standard deviation
     for j, (_, _, b) in enumerate(bands):
@@ -369,206 +318,3 @@ def get_features_yasa_eeg(a, freq_broad=(0.4, 30), sfreq=500, welch_window_sec=4
         if col != 'yasa_time':
             feat[col] = pd.to_numeric(feat[col])
     return feat
-
-
-# -------------------------------------------------------------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------------
-
-# OLD STUFF - naive-ish implementations of bandpower
-
-# ---------------------------------------------------------------------------------------------------------------------------------------
-# Use this for delta power and absolute power
-def get_rolling_band_power_welch(a, start_index, end_index, freq_range=(0.5, 4), ref_power=0.001, freq=500, window_sec=2, step_size=1):
-    """
-    Gets rolling band power for specified frequency range, data frequency and window size
-    a: array to calculate delta power 
-    start_index: start index in the input array a to start calculating delta power
-    end_index: end index in the input array a to stop calculating delta power
-    freq_range: range of frequencies in form of (lower, upper) to calculate power of
-    ref_power: arbitrary reference power to divide the windowed delta power by (used for scaling)
-    freq: frequency of the input array
-    window_sec: window size in seconds to calculate delta power (if the window is longer than the step size there will be overlap)
-    step_size: step size in seconds to calculate delta power in windows (if 1, function returns an array with 1Hz power calculations)
-
-    Example: get_rolling_band_power(eeg_data, 0, len(eeg_data), freq_range=(0.5, 4), ref_power=0.001, freq=500, window_sec=2, step_size=1)
-    """
-    def get_band_power_welch(a, start_index, end_index, freq_range=(0.5, 4), ref_power=0.001, freq=500):
-        lower_freq = freq_range[0]
-        upper_freq = freq_range[1]
-        window_length = int(window_sec*freq)
-        # TODO: maybe edit this later so there is a buffer before and after?
-        windowed_data = a[start_index:end_index] * hann(window_length)
-        freqs, psd = welch(windowed_data, window='hann', fs=freq, nperseg=window_length, noverlap=window_length//2)
-        freq_res = freqs[1] - freqs[0]
-        # Find the index corresponding to the delta frequency range
-        delta_idx = (freqs >= lower_freq) & (freqs <= upper_freq)
-        # Integral approximation of the spectrum using parabola (Simpson's rule)
-        delta_power = simpson(10 * np.log10(psd[delta_idx] / ref_power), dx=freq_res)
-        # Sum the power within the delta frequency range
-        return delta_power
-    
-    # Get rolling delta power using the helper function above
-    window_length = window_sec*freq
-    step_idx = int(step_size*freq) # step size in array indices
-    if window_length % 2 != 0:
-        print('Note: (window * frequency) is not divisible by 2, will be rounded down to ' + str(window_length - 1))
-    rolling_band_power = []
-    for i in range(start_index, end_index, step_idx):
-        window_start = int(i - window_length/2)
-        window_end = int(i + window_length/2)
-        if window_start < 0:
-            rolling_band_power.append(np.nan)
-            # print(f'Window too large for index {i}; not enough preceding point')
-        elif window_end > len(a):
-            rolling_band_power.append(np.nan)
-            # print(f'Window too large for index {i}; not enough following point')
-        else:
-            rolling_band_power.append(get_band_power_welch(a, window_start, window_end, freq_range=freq_range, ref_power=ref_power, freq=freq))
-    return np.array(rolling_band_power)
-
-
-# ---------------------------------------------------------------------------------------------------------------------------------------
-# For some reason this works better for low frequency power (0.001, 0.05) than welch
-def get_rolling_band_power_fourier_sum(a, start_index, end_index, freq_range=(0.001, 0.05), ref_power=0.001, freq=500, window_sec=60, 
-                                       step_size=1):
-    """
-    Gets rolling band power for specified frequency range, data frequency and window size
-    a: array to calculate delta power 
-    start_index: start index in the input array a to start calculating delta power
-    end_index: end index in the input array a to stop calculating delta power
-    freq_range: range of frequencies in form of (lower, upper) to calculate power of
-    ref_power: arbitrary reference power to divide the windowed delta power by (used for scaling)
-    freq: frequency of the input array
-    window_sec: window size in seconds to calculate delta power (if the window is longer than the step size there will be overlap)
-    step_size: step size in seconds to calculate delta power in windows (if 1, function returns an array with 1Hz power calculations)
-
-    Example: get_rolling_band_power(eeg_data, 0, len(eeg_data), freq_range=(0.5, 4), ref_power=0.001, freq=500, window_sec=2, step_size=1)
-    """
-
-    def get_band_power_fourier_sum(a):
-        """
-        Helper function to get delta spectral power for one array
-        """
-        # Perform Fourier transform
-        fft_data = np.fft.fft(a)
-        # Compute the power spectrum
-        power_spectrum = np.abs(fft_data)**2
-        # Frequency resolution
-        freq_resolution = freq / len(a)
-        # Find the indices corresponding to the delta frequency range
-        delta_freq_indices = np.where((np.fft.fftfreq(len(a), 1/freq) >= freq_range[0]) & 
-                                      (np.fft.fftfreq(len(a), 1/freq) <= freq_range[1]))[0]
-        # Compute the delta spectral power
-        delta_power = 10 * np.log(np.sum(power_spectrum[delta_freq_indices]) * freq_resolution / ref_power)
-
-        return delta_power
-
-    window_length = window_sec*freq
-    step_idx = int(step_size*freq)
-    if window_length % 2 != 0:
-        print('Note: (window * frequency) is not divisible by 2, will be rounded down to ' + str(window_length - 1))
-    rolling_band_power = []
-    for i in range(start_index, end_index, step_idx):
-        window_start = int(i - window_length/2)
-        window_end = int(i + window_length/2)
-        if window_start < 0:
-            rolling_band_power.append(np.nan)
-            # print(f'Window too large for index {i}; not enough preceding point')
-        elif window_end > len(a):
-            rolling_band_power.append(np.nan)
-            # print(f'Window too large for index {i}; not enough following point')
-        else:
-            rolling_band_power.append(get_band_power_fourier_sum(a[window_start:window_end]))
-    return np.array(rolling_band_power)
-
-
-# This function is too slow although it performs slightly better
-def get_rolling_band_power_multitaper(a, start_index, end_index, freq_range=(0.5, 4), ref_power=1e-13, freq=500, window_sec=2,
-                                      step_size=1, in_dB=True):
-    """
-    Gets rolling band power for specified frequency range, data frequency and window size
-    a: array to calculate delta power 
-    start_index: start index in the input array a to start calculating delta power
-    end_index: end index in the input array a to stop calculating delta power
-    freq_range: range of frequencies in form of (lower, upper) to calculate power of
-    ref_power: arbitrary reference power to divide the windowed delta power by (used for scaling)
-    freq: frequency of the input array
-    window_sec: window size in seconds to calculate delta power (if the window is longer than the step size there will be overlap)
-    step_size: step size in seconds to calculate delta power in windows (if 1, function returns an array with 1Hz power calculations)
-    in_dB: boolean for whether to convert the output into decibals
-
-    Example: get_rolling_band_power_multitaper(eeg_data, 0, len(eeg_data), freq_range=(0.5, 4), ref_power=0.001) # get delta frequency
-    """
-    def get_band_power_multitaper(a, start_index, end_index):
-
-        # TODO: maybe edit this later so there is a buffer before and after?
-        psd, freqs = mne.time_frequency.psd_array_multitaper(a[start_index:end_index], sfreq=freq,
-                                                                   fmin=freq_range[0], fmax=freq_range[1], adaptive=True, 
-                                                                   normalization='full', verbose=False)
-        freq_res = freqs[1] - freqs[0]
-        # Find the index corresponding to the delta frequency range
-        delta_idx = (freqs >= freq_range[0]) & (freqs <= freq_range[1])
-        # Integral approximation of the spectrum using parabola (Simpson's rule)
-        delta_power = psd[delta_idx] / ref_power
-        if in_dB:
-            delta_power = simpson(10 * np.log10(delta_power), dx=freq_res)
-        else:
-            delta_power = np.mean(delta_power)
-        # Sum the power within the delta frequency range
-        return delta_power
-
-    window_length = window_sec*freq
-    step_idx = int(step_size*freq)
-    if window_length % 2 != 0:
-        print('Note: (window * frequency) is not divisible by 2, will be rounded down to ' + str(window_length - 1))
-    rolling_band_power = []
-    for i in range(start_index, end_index, step_idx):
-        window_start = int(i - window_length/2)
-        window_end = int(i + window_length/2)
-        if window_start < 0:
-            rolling_band_power.append(np.nan)
-            # print(f'Window too large for index {i}; not enough preceding point')
-        elif window_end > len(a):
-            rolling_band_power.append(np.nan)
-            # print(f'Window too large for index {i}; not enough following point')
-        else:
-            rolling_band_power.append(get_band_power_multitaper(a, window_start, window_end))
-    return np.array(rolling_band_power)
-
-
-def get_rolling_zero_crossings(a, start_index, end_index, freq=500, window_sec=1, step_size=1):
-    """
-    Get the zero-crossings of an array with a rolling window
-    a: array to find zero crossings for
-    start_index: index of the start position
-    end_index: index of the end position (exclusive)
-    window_sec: window in seconds
-    step_size: step size in seconds (step_size of 1 would mean returend data will be 1 Hz)
-
-    Example: get_rolling_zero_crossings(eeg_data, 0, len(eeg_data), freq=500, window_sec=1, step_size=1)
-    """
-    window_length = window_sec*freq
-    step_idx = int(step_size * freq)
-    if window_length % 2 != 0:
-        print('Note: (window * frequency) is not divisible by 2, will be rounded down to ' + str(window_length - 1))
-    rolling_zero_crossings = []
-    for i in range(start_index, end_index, step_idx):
-        window_start = int(i - window_length/2)
-        window_end = int(i + window_length/2)
-        if window_start < 0:
-            #window_start = 0
-            rolling_zero_crossings.append(np.nan)
-            # print(f'Window too large for index {i}; not enough preceding point')
-        elif window_end > len(a):
-            #window_end = len(a)
-            rolling_zero_crossings.append(np.nan)
-            # print(f'Window too large for index {i}; not enough following point')
-        else:
-            rolling_zero_crossings.append(((a[window_start:window_end-1] * a[window_start+1:window_end]) < 0).sum() / window_sec)
-    return np.array(rolling_zero_crossings)
