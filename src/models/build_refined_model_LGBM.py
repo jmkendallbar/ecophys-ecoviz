@@ -86,18 +86,18 @@ def iterate_single_models(training_df, target_col):
 
     return setting_accuracy_df, setting_outputs # return setting accuracy dataframe and model outputs (in case we want predictions and feature importances later)
 
-def build_refined_model_LGBM(training_df, target_col, features_outfile, setting_accuracies_folder=None, outfile=None, matrix_outfile=None):
+def build_refined_model_LGBM(training_df, target_col, features_outfile, setting_accuracies_outfile=None, outfile=None, matrix_outfile=None):
     """
     Discovers and builds the best "refined" model, using only the minimum best settings for EEG and ECG features
     training_df: pandas dataframe containing features and target (only one column should be the target variable while the rest are features)
     target_col: string name of the target column
-    setting_accuracies_folder: folder to save the setting accuracies .csv
+    setting_accuracies_outfile: folder to save the setting accuracies .csv
     outfile: output filepath to store the model as a .pkl
     matrix_outfile: output filepath to store the confusion matrix as a .csv
     """
     setting_accuracy_df, setting_outputs = iterate_single_models(training_df, target_col)
-    if setting_accuracies_folder is not None:
-        setting_accuracy_df.to_csv('Refined_model_epoch_and_welch_setting_accuracies.csv')
+    if setting_accuracies_outfile is not None:
+        setting_accuracy_df.to_csv(setting_accuracies_outfile)
     settings_to_include = []
     for sleep_state in ['Active Waking', 'Quiet Waking', 'Drowsiness', 'SWS', 'REM']:
         # order accuracies by current sleep_state
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     FEATURES_OUTPUT_FILE = 'data/processed/test12_Wednesday_08_refined_features_with_labels_v3.csv'
     MODEL_OUTPUT_FILE = 'models/lightgbm_model_refined.pkl'
     CONFUSION_MATRIX_OUTPUT_FILE = 'models/lightgbm_model_refined_confusion_matrix.csv'
-    SETTING_ACCURIES_OUTPUT_FOLDER = 'data/interim/setting_accuracies'
+    SETTING_ACCURIES_OUTPUT_FILE = 'data/interim/setting_accuracies.csv'
     best_params = {'learning_rate': 0.005, 'n_estimators': 400, 'num_leaves': 10}
     parser = ArgumentParser()
     parser.add_argument("-b", "--basic_features", dest="basic_features", type=str, help="basic training features .csv filepath (for GyrZ, MagZ, ODBA, Pressure)",
@@ -162,12 +162,10 @@ if __name__ == '__main__':
                         default=MODEL_OUTPUT_FILE)
     parser.add_argument("-m", "--matrix", dest="matrix", type=str, help="output confusion matrix .csv filepath",
                         default=CONFUSION_MATRIX_OUTPUT_FILE)
-    parser.add_argument("-a", "--setting_accuracies", dest="setting_accuracies", type=str, help="output folder for setting accuracies",
-                        default=SETTING_ACCURIES_OUTPUT_FOLDER)
+    parser.add_argument("-a", "--setting_accuracies", dest="setting_accuracies", type=str, help="output setting accuracies .csv filepath",
+                        default=SETTING_ACCURIES_OUTPUT_FILE)
 
     args = parser.parse_args()
-    os.makedirs(args.setting_accuracies, exist_ok=True)
-
     # Check parameters point to actual files
     for arg in vars(args):
         val = getattr(args, arg)

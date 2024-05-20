@@ -58,7 +58,7 @@ def plot_nap(df, labels_col, nap_start_dt, nap_end_dt, preds=None, labels_ordere
     fig = plt.figure(figsize=figsize)
     # Create subplots manually using gridspec so that we can make the first subplot bigger
     ax = []
-    gs = gridspec.GridSpec(nplots, 1, height_ratios=[1]*(nplots-1) + [1.5])
+    gs = gridspec.GridSpec(nplots, 1, height_ratios=[1]*(nplots-1) + [1.75])
     for i in range(nplots):
         ax.append(fig.add_subplot(gs[i]))
 
@@ -75,6 +75,8 @@ def plot_nap(df, labels_col, nap_start_dt, nap_end_dt, preds=None, labels_ordere
     ax[-1].matshow(labels_as_ints.reshape(1, -1), aspect='auto', cmap=(ListedColormap(label_colors)))
     patches = [Patch(color=LABEL_COLORS[label], label=label) for label in labels_ordered]
     ax[-1].legend(handles=patches)
+    ax[-1].set_yticks([])
+    ax[-1].set_ylabel('True\nLabel')
 
     # Plot Predictions
     if preds is not None:
@@ -83,6 +85,8 @@ def plot_nap(df, labels_col, nap_start_dt, nap_end_dt, preds=None, labels_ordere
                               ignore_index=True)
         preds_as_ints = np.array([label_keys.index(val) for val in preds_nap]) # integer value represents the index in the label_keys
         ax[-2].matshow(preds_as_ints.reshape(1, -1), aspect='auto', cmap=(ListedColormap(label_colors)))
+        ax[-2].set_yticks([])
+        ax[-2].set_ylabel('Pred.\nLabel')
 
     # Absolute Delta Power
     abs_delta_power_subplot = 0

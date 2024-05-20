@@ -31,13 +31,14 @@ def build_model_LGBM(training_df, target_col, outfile=None, params={'learning_ra
 
 
 def evaluate_model(training_df, target_col, outfile=None, params={'learning_rate': 0.005, 'n_estimators': 400, 'num_leaves': 10},
-                   verbosity=1):
+                   return_preds=False, verbosity=1):
     """
     Evaluates the performance of an LGBM model on the training_df features in predicting the target_col, using k-fold validation
     training_df: pandas dataframe containing features and target (only one column should be the target variable while the rest are features)
     target_col: string name of the target column
     outfile: location to save the confusion matrix as a .csv
     params: parameters to pass into LGBM, by default uses parameters that were found using GridSearchCV on the seal Wednesday
+    return_preds: whether to return the predictions
     verbosity: level of verbosity for the LGBMClassifier and its performance (-1 = none, 0 = model eval but not LightGBM, 1 = all)
     """
     model_df = training_df.dropna()
@@ -111,6 +112,8 @@ def evaluate_model(training_df, target_col, outfile=None, params={'learning_rate
     if outfile is not None:
         conf_matrices_combined.to_csv(outfile)
     
+    if return_preds:
+        return (overall_accuracies, mean_class_accuracies, conf_matrices_combined, summed_conf_matr, kfold_preds)
     return (overall_accuracies, mean_class_accuracies, conf_matrices_combined, summed_conf_matr)
 
 
@@ -128,7 +131,7 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--output", dest="output", type=str, help="output model .pkl filepath",
                         default=MODEL_OUTPUT_FILE)
     parser.add_argument("-c", "--matrix", dest="matrix", type=str, help="output confusion matrix .csv filepath",
-                        default=MODEL_OUTPUT_FILE)
+                        default=CONFUSION_MATRIX_OUTPUT_FILE)
 
     args = parser.parse_args()
     

@@ -121,12 +121,12 @@ if __name__ == '__main__':
     start_time = time.time()
     WED_INPUT_FILE = 'data/raw/01_edf_data/test12_Wednesday_05_ALL_PROCESSED.edf'
     WED_OUTPUT_FOLDER = 'data/interim/feature_discovery/'
-    WED_OUTPUT_FILENAME = 'Wednesday_feature_discovery'
+    WED_OUTPUT_FILENAME = 'test12_Wednesday_feature_discovery'
     WED_LABELS_FILE = 'data/raw/02_hypnogram_data/test12_Wednesday_06_Hypnogram_JKB_1Hz.csv'
     parser = ArgumentParser()
     parser.add_argument("-i", "--input", dest="input", type=str, help="input .edf filepath",
                         default=WED_INPUT_FILE)
-    parser.add_argument("-d", "--output-dir", dest="output_dir", type=str, help="output folder filepath (will create an ECG and EEG subfolder)",
+    parser.add_argument("-d", "--output-dir", dest="output_dir", type=str, help="output folder filepath (will create an ECG and EEG feature .csv)",
                         default=WED_OUTPUT_FOLDER)
     parser.add_argument("-o", "--output-file-name", dest="file_name", type=str, help="name of output file",
                         default=WED_OUTPUT_FILENAME)
