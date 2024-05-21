@@ -11,3 +11,4 @@ data/interim/*
 data/processed/*
 data/raw/01_edf_data/*
 data/raw/02_hypnogram_data/*
+models/*
