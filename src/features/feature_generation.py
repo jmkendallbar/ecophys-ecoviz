@@ -36,9 +36,9 @@ DEFAULT_CONFIG = {
     'YASA EEG Epoch Window Size': 30, # Window size in seconds to use for YASA feature epochs
     'YASA EEG Welch Window Size': 4, # Window size in seconds to use for YASA welch power spectral density calculation
     'YASA EEG Step Size': 1, # Step size in seconds of windows for YASA epochs
-    'YASA Heart Rate Epoch Window Size': 180, # Window size in seconds to use for YASA heart rate feature epochs
+    'YASA Heart Rate Epoch Window Size': 256, # Window size in seconds to use for YASA heart rate feature epochs
     'YASA Heart Rate Welch Window Size': 4, # Window size in seconds to use for YASA heart rate welch power spectral density calculation
-    'YASA Heart Rate Step Size': 1, # Step size in seconds of windows for YASA heart rate epochs
+    'YASA Heart Rate Step Size': 32, # Step size in seconds of windows for YASA heart rate epochs
 }
 def generate_features(path_to_edf, output_csv_path=None, custom_config=None, hours_at_a_time=1):
     """

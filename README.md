@@ -5,7 +5,6 @@
 <!-- badges: end -->
 
 
-
 ### Folder structure (after running all make targets)
 
 ```
@@ -129,7 +128,7 @@ Here's how the pipeline flows from the Makefile (this will run the pipeline on t
 
 ## Python script usage
 
-Each python script besides visualize.py can be run from the command-line as main, and has different options which when provided can change its usage. Each make target (besides make download) calls one of these python scripts, as follows:
+Each python script besides visualize.py and feature_generation_utils.py can be run from the command-line as main, and has different options which when provided can change its usage. Each make target (besides make download) calls one of these python scripts, as follows:
     - `make features`: python src/features/feature_generation.py
     - `make model`: python src/models/build_model_LGBM.py
     - `make features_extended`: python src/features/feature_generation_extended.py
@@ -143,14 +142,18 @@ Each of these python scripts have different options available, and these options
 Generates the sleep features from an EDF file.
 
 ```
-usage: feature_generation.py [-h] [-i INPUT] [-o OUTPUT] [-l LABELS] [-c CONFIG]
+usage: feature_generation.py [-h] [-i INPUT] [-o OUTPUT] [-t IS_SEPARATED] [-s SEAL_NAME] [-l LABELS] [-c CONFIG]
 
 options:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
-                        input .edf filepath
+                        input .edf filepath if reading one file, or input folder containing split seal .edf files if reading separated files
   -o OUTPUT, --output OUTPUT
-                        output .csv filepath
+                        output .csv filepath if reading one file, or output folder if input is split seal .edf files if reading separated files
+  -t IS_SEPARATED, --is_separated IS_SEPARATED
+                        whether to read multiple .edf files from input folder, or read one single .edf file, True = multiple, False = single
+  -s SEAL_NAME, --seal_name SEAL_NAME
+                        seal name that is in the split .edf files, to be used with a folder --input
   -l LABELS, --labels LABELS
                         optional .csv filepath with 1Hz labels
   -c CONFIG, --config CONFIG
@@ -158,6 +161,8 @@ options:
 ```
     - `-i`: input .edf file to use for feature generation. This **must** have an ECG and EEG Channel, and if it is different than *ECG_Raw_Ch1* and *EEG_ICA5*, you must specify this in a config.json file
     - `-o`: output .csv filepath - where to save the features file. This should be the full or relative filepath and include the file name with extension
+    - `-t`: whether the input EDF is split into multiple days (if it is, then the input -i shoud be a path to a folder, and the output -o should be a path to a folder)
+    - `-s`: to be used with -t True, the seal name to look for in the folder; will concatenate all EDF files with that seal name in chronological order (looking up their recording start times)
     - `-l`: optional path to 1Hz hypnogram labels .csv to include in the features output as a 'Simple.Sleep.Code' column
     - `-c`: JSON config file to overwrite the default settings in the feature_generation.py python script. These settings and their default values are (you can copy this JSON dictionary and save it as a text file with the .json extension, replacing the values you would like to change):
 
@@ -184,6 +189,19 @@ DEFAULT_CONFIG = {
     'YASA Heart Rate Welch Window Size': 4, # Window size in seconds to use for YASA heart rate welch power spectral density calculation
     'YASA Heart Rate Step Size': 1, # Step size in seconds of windows for YASA heart rate epochs
 }
+```
+
+Example: (input is one .EDF file):
+
+```
+python src/features/feature_generation.py -i data/raw/01_edf_data/test12_Wednesday_05_ALL_PROCESSED.edf -o data/processed/features/test12_Wednesday_07_features_with_labels.csv -l data/raw/02_hypnogram_data/test12_Wednesday_06_Hypnogram_JKB_1Hz.csv
+```
+Note that -s is only needed if -t is set to True, and if -c is excluded the program uses the default configuration
+
+Example: (input is all the .EDF files in data/raw/01_edf_data containing test33_HypoactiveHeidi in the file name, output is the folder data/processed) - the program will create a folder named test33_HypoactiveHeidi inside data/processed and save all feature files to that folder
+
+```
+python src/features/feature_generation.py -i data/raw/01_edf_data -o data/processed -t True -s test33_HypoactiveHeidi -l data/raw/02_hypnogram_data/test33_HypoactiveHeidi_06_Hypnogram_JKB_1Hz.csv -c data/raw/config/HypoactiveHeidi_config.json
 ```
 
 #### python src/models/build_model_LGBM.py --help
@@ -297,35 +315,45 @@ options:
 ## Start to finish - Running the pipeline on a new seal (or a new animal)
 
 1. This requires an EDF file. To start, make sure you know what channels are inside your input .EDF file. The most important for this pipeline are the desired EEG and ECG channels, as well as Pressure (or Depth), MagZ, and ODBA (if applicable). To set these channels, create a JSON file named config.json (you can put it anywhere but inside data/interim would work well), with the following content:
+    - You can change any preferences you would like to, but most importantly make sure to set *ECG Channel* and *EEG Channel*. For Pressure, MagZ, and ODBA, if you have the channel data in your EDF, then change the value to whatever your channel is named. If you do not have one or all of these channels, you can set the value to *null* (without quotes, otherwise the program will look for a channel named "null").
 
 ```
 {
-    'ECG Channel': 'ECG_Raw_Ch1', # ECG Channel
-    'EEG Channel': 'EEG_ICA5', # EEG Channel
-    'Pressure Channel': 'Pressure', # Pressure/Depth
-    'GyrZ Channel': 'GyrZ', # Gyroscope Z
-    'ODBA Channel': 'ODBA', # Overall dynamic body acceleration
-    'Step Size': 1, # Step size in seconds to perform feature calculations (if 1, returned data will be 1 Hz, if 2, returned data will be 0.5 Hz)
-    'Heart Rate Search Radius': 200, # Search radius in sample points (this number is affected by frequency of data) to search for R peaks in heart rate
-    'Heart Rate Filter Threshold': 200, # Heart rate BPM threshold above which to throw out values and fill with surrounding values (for sensor noise)
-    'Pressure Freq': 25, # Frequency of Pressure data
-    'Pressure Calculation Window': 30, # Window size in seconds to use for pressure mean and standard deviation
-    'ODBA Freq': 25, # Frequency of ODBA data
-    'ODBA Calculation Window': 30, # Window size in seconds to use for ODBA mean and standard deviation
-    'GyrZ Freq': 25, # Frequency of GyrZ data
-    'GyrZ Calculation Window': 30, # Window size in seconds to use for GyrZ mean and standard deviation
-    'YASA EEG Epoch Window Size': 30, # Window size in seconds to use for YASA feature epochs
-    'YASA EEG Welch Window Size': 4, # Window size in seconds to use for YASA welch power spectral density calculation
-    'YASA EEG Step Size': 1, # Step size in seconds of windows for YASA epochs
-    'YASA Heart Rate Epoch Window Size': 60, # Window size in seconds to use for YASA heart rate feature epochs
-    'YASA Heart Rate Welch Window Size': 4, # Window size in seconds to use for YASA heart rate welch power spectral density calculation
-    'YASA Heart Rate Step Size': 1, # Step size in seconds of windows for YASA heart rate epochs
+    "ECG Channel": "ECG_Raw_Ch1",
+    "EEG Channel": "EEG_ICA5",
+    "Pressure Channel": "Pressure",
+    "GyrZ Channel": "GyrZ",
+    "ODBA Channel": "ODBA",
+    "Step Size": 1,
+    "Heart Rate Search Radius": 200,
+    "Heart Rate Filter Threshold": 200,
+    "Pressure Freq": 25,
+    "Pressure Calculation Window": 30,
+    "ODBA Freq": 25,
+    "ODBA Calculation Window": 30,
+    "GyrZ Freq": 25,
+    "GyrZ Calculation Window": 30,
+    "YASA EEG Epoch Window Size": 30,
+    "YASA EEG Welch Window Size": 4,
+    "YASA EEG Step Size": 1,
+    "YASA Heart Rate Epoch Window Size": 60,
+    "YASA Heart Rate Welch Window Size": 4,
+    "YASA Heart Rate Step Size": 1
 }
 ```
 
-    - You can change any preferences you would like to, but most importantly make sure to set *ECG Channel* and *EEG Channel*. For Pressure, MagZ, and ODBA, if you have the channel data in your EDF, then change the value (not the key) to whatever your channel is named. If you do not have one or all of these channels, you can set the value to *null* (without quotes, otherwise the program will look for a channel named "null"). 
-
-2. Call `feature_generation.py [-i PATH_TO_INPUT_EDF] [-o PATH_TO_OUTPUT_FEATURES_CSV] [-l PATH_TO_HYNPOGRAM_CSV] [-c PATH_TO_CONFIG_JSON]`
+2. Run `python feature_generation.py [-i PATH_TO_INPUT_EDF] [-o PATH_TO_OUTPUT_FEATURES_CSV] [-l PATH_TO_HYNPOGRAM_CSV] [-c PATH_TO_CONFIG_JSON]`
     - -l is optional, so if you wish to generate features and make predictions with a pre-built model, use it without a hypnogram file, but if you wish to build a model with these generate features, you must provide a hypnogram file to -l for the next steps to function properly
 
-3. 
+3. Run `python build_model_LGBM.py build_model_LGBM.py [-i INPUT] [-o OUTPUT] [-c MATRIX]`
+
+4. Run `python feature_generation_extended.py [-i INPUT] [-d OUTPUT_DIR] [-o FILE_NAME] [-e EEG] [-c ECG] [-l LABELS]`
+    - This step allows you to build a model that include the features calculated at a wide variety of epoch and welch window sizes, and also also you to calculated the "refined model", which only include the best welch and epoch sizes for each sleep state
+
+5. Run `python build_extended_model_LGBM.py [-b BASIC_FEATURES] [-e EEG_FEATURES] [-c ECG_FEATURES] [-o OUTPUT] [-m MATRIX] [-v VIZ_FOLDER]`
+    - This step builds a model that includes all the features generation in step 4 (as long as LightGBM finds the features to be useful)
+    - This step also generates all of the feature importance plots that can be seen (as generate from the seal Wednesday) in the notebook *04_lgbm_feature_discovery.ipynb*
+
+6. Run `python build_refined_model_LGBM.py build_refined_model_LGBM.py [-i INPUT] [-o OUTPUT]`
+    - This step will output a features file containing only features generated with a setting found to be the most important for one of the sleep states
+    - It will also save a confusion matrix to wherever the model is saved.
