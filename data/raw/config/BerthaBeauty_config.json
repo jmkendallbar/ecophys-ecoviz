@@ -1,7 +1,11 @@
 {
-    "Pressure Channel": "Depth",
     "EEG Channel": "REEG2_Pruned_Ch7",
-    "ODBA Channel": null,
+    "Pressure Channel": "Pressure",
+    "GyrZ Channel": "GyrZ",
+    "MagZ Channel": "MagZ",
+    "ODBA Channel": "ODBA",
+    "Pressure Freq": 500,
     "GyrZ Freq": 500,
-    "Pressure Freq": 500
+    "MagZ Freq": 500,
+    "ODBA Freq": 500 
 }
