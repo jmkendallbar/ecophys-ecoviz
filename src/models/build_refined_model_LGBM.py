@@ -43,7 +43,6 @@ def iterate_single_models(training_df, target_col):
             eeg_settings.append(matches[0])
     # movement & pressure columns and target column
     general_columns = [col for col in training_df.columns if ('EEG' not in col and 'HR' not in col and 'yasa' not in col and col != target_col)] + [target_col]
-   
 
     # only get unique settings
     hr_settings = sorted(list(set(hr_settings)))
@@ -64,6 +63,7 @@ def iterate_single_models(training_df, target_col):
             simple_model_df = training_df.loc[:,col_filter].copy()
             overall_accuracies, mean_class_accuracies, conf_matrices_combined, summed_conf_matr = evaluate_model(simple_model_df, target_col, verbosity=-1)
             setting_outputs.append((eeg_setting_string, hr_setting_string, overall_accuracies, mean_class_accuracies, conf_matrices_combined, summed_conf_matr))
+            counter += 1
     print('100% complete' + ' '*50)
     # make accuracy dataframe from output
     setting_accuracy_df_dict = {
@@ -125,7 +125,7 @@ def build_refined_model_LGBM(training_df, target_col, features_outfile, setting_
 
     # Build and evaluate refined model
     model = build_model_LGBM(refined_training_df, target_col, outfile=outfile) # also saves model to output .pkl file
-    overall_accuracies, mean_class_accuracies, conf_matrices_combined, summed_conf_matr = evaluate_model(training_df, target_col, outfile=matrix_outfile) # also saved confusion matrix to output .csv file
+    overall_accuracies, mean_class_accuracies, conf_matrices_combined, summed_conf_matr = evaluate_model(refined_training_df, target_col, outfile=matrix_outfile, verbosity=-1) # also saved confusion matrix to output .csv file
     print("Overall accuracy: ", round(np.mean(overall_accuracies) * 100, 2), '%', sep='')
     print()
     print("Mean class accuracies across folds:")
@@ -141,10 +141,10 @@ if __name__ == '__main__':
     """
     For help strings, run python build_refined_model_LGBM.py --help
     """
-    TRAINING_FEATURES_FILE = 'data/processed/Wednesday_features_with_labels_v3.csv'
+    TRAINING_FEATURES_FILE = 'data/processed/features/test12_Wednesday_07_features_with_labels.csv'
     EEG_FEATURES_FILE = 'data/interim/feature_discovery/EEG/Wednesday_feature_discovery_EEG.csv'
     HEARTRATE_FEATURES_FILE = 'data/interim/feature_discovery/ECG/Wednesday_feature_discovery_ECG.csv'
-    FEATURES_OUTPUT_FILE = 'data/processed/test12_Wednesday_08_refined_features_with_labels_v3.csv'
+    FEATURES_OUTPUT_FILE = 'data/processed/features/test12_Wednesday_08_refined_features_with_labels.csv'
     MODEL_OUTPUT_FILE = 'models/lightgbm_model_refined.pkl'
     CONFUSION_MATRIX_OUTPUT_FILE = 'models/lightgbm_model_refined_confusion_matrix.csv'
     SETTING_ACCURIES_OUTPUT_FILE = 'data/interim/setting_accuracies.csv'

@@ -121,7 +121,7 @@ if __name__ == '__main__':
     """
     For help strings, run python build_model_LGBM.py --help
     """
-    TRAINING_FEATURES_FILE = 'data/processed/Wednesday_features_with_labels_v3.csv'
+    TRAINING_FEATURES_FILE = 'data/processed/features/Wednesday_features_with_labels_v3.csv'
     MODEL_OUTPUT_FILE = 'models/lightgbm_model_basic.pkl'
     CONFUSION_MATRIX_OUTPUT_FILE = 'models/lightgbm_model_basic_confusion_matrix.csv'
     best_params = {'learning_rate': 0.005, 'n_estimators': 400, 'num_leaves': 10}
