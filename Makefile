@@ -31,26 +31,26 @@ $(HYPNO_DATA_DIR)/test12_Wednesday_06_Hypnogram_JKB_1Hz.csv:
 download: $(EDF_DATA_DIR)/test12_Wednesday_05_ALL_PROCESSED.edf $(HYPNO_DATA_DIR)/test12_Wednesday_06_Hypnogram_JKB_1Hz.csv
 
 # Simple features - Step 1
-$(FEATURES_DIR)/test12_Wednesday_07_features_with_labels.csv: download
+$(FEATURES_DIR)/test12_Wednesday_07_features_with_labels.csv:
 	python src/features/feature_generation.py
 
-features: $(FEATURES_DIR)/test12_Wednesday_07_features_with_labels.csv
+features: download $(FEATURES_DIR)/test12_Wednesday_07_features_with_labels.csv
 
-models/lightgbm_model_basic.pkl: $(FEATURES_DIR)/test12_Wednesday_07_features_with_labels.csv
+models/lightgbm_model_basic.pkl:
 	python src/models/build_model_LGBM.py
 
-model: models/lightgbm_model_basic.pkl
+model: features models/lightgbm_model_basic.pkl
 
 # Extended features - Optional step 2
 $(FEAT_DISC_DIR)/EEG/Wednesday_feature_discovery_EEG.csv:
 	python src/features/feature_generation_extended.py
 
-features_extended: $(FEAT_DISC_DIR)/EEG/Wednesday_feature_discovery_EEG.csv $(FEAT_DISC_DIR)/ECG/Wednesday_feature_discovery_ECG.csv download features
+features_extended: download features $(FEAT_DISC_DIR)/EEG/Wednesday_feature_discovery_EEG.csv $(FEAT_DISC_DIR)/ECG/Wednesday_feature_discovery_ECG.csv
 
 models/lightgbm_model_extended.pkl:
 	python src/models/build_extended_model_LGBM.py
 
-model_extended: models/lightgbm_model_extended.pkl features_extended
+model_extended: features_extended models/lightgbm_model_extended.pkl
 
 # Refined model using features generated with best epoch & welch settings - Step 3 (will use default output unless step 2 has run)
 models/lgbm_model_refined.pkl:

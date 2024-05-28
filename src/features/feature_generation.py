@@ -36,8 +36,8 @@ DEFAULT_CONFIG = {
     'YASA EEG Epoch Window Size': 32, # Window size in seconds to use for YASA feature epochs
     'YASA EEG Welch Window Size': 4, # Window size in seconds to use for YASA welch power spectral density calculation
     'YASA EEG Step Size': 4, # Step size in seconds of windows for YASA epochs
-    'YASA Heart Rate Epoch Window Size': 64, # Window size in seconds to use for YASA heart rate feature epochs
-    'YASA Heart Rate Welch Window Size': 16, # Window size in seconds to use for YASA heart rate welch power spectral density calculation
+    'YASA Heart Rate Epoch Window Size': 128, # Window size in seconds to use for YASA heart rate feature epochs
+    'YASA Heart Rate Welch Window Size': 32, # Window size in seconds to use for YASA heart rate welch power spectral density calculation
     'YASA Heart Rate Step Size': 8, # Step size in seconds of windows for YASA heart rate epochs
 }
 def generate_features(path_to_edf, output_csv_path=None, custom_config=None, hours_at_a_time=1):
@@ -372,7 +372,7 @@ if __name__ == '__main__':
     For help strings, run python feature_generation.py --help
     """
     WED_INPUT_FILE = 'data/raw/01_edf_data/test12_Wednesday_05_ALL_PROCESSED.edf'
-    WED_OUTPUT_FILE = 'data/processed/features/test12_Wednesday_07_features_with_labels.csv'
+    WED_OUTPUT_FILE = 'data/processed/features/Wednesday_features_with_labels_v3.csv'
     WED_LABELS_FILE = 'data/raw/02_hypnogram_data/test12_Wednesday_06_Hypnogram_JKB_1Hz.csv'
     parser = ArgumentParser()
     parser.add_argument("-i", "--input", dest="input", type=str,
